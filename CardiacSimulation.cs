@@ -217,7 +217,7 @@ public class CardiacSimulation : MonoBehaviour
     private bool isParameterEnabled;
 
     private HashSet<int> ablationNodes;
-    private int[] triggerNodes = new int[10];
+    private HashSet<int> triggerNodes; 
     private int triggerCurrNum = 0; // trigger number <= 10
 
     private Matrix<double> m_lap;
@@ -228,17 +228,22 @@ public class CardiacSimulation : MonoBehaviour
     private Vector<double> dydt;
     private Vector<double> y_next;
     private int[] color_idx;
+    private int rayNode = -1;
 
     private GameObject rightHandController;
     private XRRayInteractor xrRayInteractor;
     private Bounds[] vertexbounds;
 
     private GameObject triggerButtonObject;
+    private GameObject triggerButtonTextObject;
     private GameObject triggerTextObject;
+    private GameObject ablationTextObject;
     private GameObject leftControllerTextObject;
     private GameObject rightControllerTextObject;
     private Text isAblation;
     private Text leftControllerPosition;
+    private Text triggerText;
+    private Text ablationText;
     private Text rightControllerPosition;
 
 
@@ -254,11 +259,11 @@ public class CardiacSimulation : MonoBehaviour
             Button button = triggerButtonObject.GetComponent<Button>();
             button.onClick.AddListener(ButtonClicked);
         }
-        triggerTextObject = GameObject.Find("GlassTextForButton");
-        if (triggerTextObject != null)
+        triggerButtonTextObject = GameObject.Find("GlassTextForButton");
+        if (triggerButtonTextObject != null)
         {
             // Get the Button component from the found GameObject
-            isAblation = triggerTextObject.GetComponent<Text>();
+            isAblation = triggerButtonTextObject.GetComponent<Text>();
         }
         leftControllerTextObject = GameObject.Find("GlassTextForLeftController");
         if (leftControllerTextObject != null)
@@ -271,6 +276,18 @@ public class CardiacSimulation : MonoBehaviour
         {
             // Get the Button component from the found GameObject
             rightControllerPosition = rightControllerTextObject.GetComponent<Text>();
+        }
+        triggerTextObject = GameObject.Find("GlassTextForTriggers");
+        if (triggerTextObject != null)
+        {
+            // Get the Button component from the found GameObject
+            triggerText = triggerTextObject.GetComponent<Text>();
+        }
+        ablationTextObject = GameObject.Find("GlassTextForAblations");
+        if (ablationTextObject != null)
+        {
+            // Get the Button component from the found GameObject
+            ablationText = ablationTextObject.GetComponent<Text>();
         }
         _inputData = GetComponent<InputData>();
         isParameterEnabled = true;
@@ -332,6 +349,7 @@ public class CardiacSimulation : MonoBehaviour
 
         laplacian = ComputeLaplacian();
         ablationNodes = new HashSet<int>();
+        triggerNodes = new HashSet<int>();
 
         vertexbounds = new Bounds[N];
         for(int i = 0; i < N; i ++)
@@ -385,12 +403,21 @@ public class CardiacSimulation : MonoBehaviour
         }
         foreach (int i in idx)
             Iex[i] = stimulusStrength;
-        for(int i = 0; i < triggerCurrNum; i++)
+        /*for(int i = 0; i < triggerCurrNum; i++)
         {
             double trigTime = triggerTime[i];
             if (tt >= trigTime && tt <= trigTime + stimulusDuration)
                 idx = findPositiveIndexVector(laplacian[triggerNodes[i]]);
+        }*/
+        int trigID = 0;
+        foreach (int node in triggerNodes)
+        {
+            double trigTime = triggerTime[trigID];
+            if (tt >= trigTime && tt <= trigTime + stimulusDuration)
+                idx = findPositiveIndexVector(laplacian[node]);
+            trigID++;
         }
+            
         foreach (int i in idx)
             Iex[i] = triggerStrength;
         I_ext = Vector<double>.Build.DenseOfArray(Iex);
@@ -421,6 +448,26 @@ public class CardiacSimulation : MonoBehaviour
         isParameterEnabled ^= true;
     }
 
+    private bool inAblationNodes(int i)
+    {
+        foreach (int j in ablationNodes)
+        {
+            if (j == i)
+                return true;
+        }
+        return false;
+    }
+
+    private bool inTriggerNodes(int i)
+    {
+        foreach (int j in triggerNodes)
+        {
+            if (j == i)
+                return true;
+        }
+        return false;
+    }
+
     void Update()
     {
         // laplacian = ComputeLaplacian();
@@ -431,17 +478,21 @@ public class CardiacSimulation : MonoBehaviour
             // Update the current time
             tt += dt;
 
+            if (rayNode > 0)
+                color_idx[rayNode] = 64;
+
             // ablation nodes visualization
             foreach (int i in ablationNodes)
-                color_idx[i] = 55;
+                color_idx[i] = 25;
 
             // trigger nodes visualization
             foreach (int i in triggerNodes)
-                color_idx[i] = 18;
+                color_idx[i] = 55;
 
             // visualize
             ShowGameObject(triangles, mesh, meshRenderer, materials_get, color_idx);
             ShowGameObject(triangles, mesh_flip, meshRenderer_flip, materials_get_flip, color_idx);
+            rayNode = -1;
         }
 
         /*if (Input.GetKeyDown(KeyCode.Space))
@@ -452,41 +503,47 @@ public class CardiacSimulation : MonoBehaviour
         if (isParameterEnabled)
         {
             isAblation.text = "Ablation Mode";
-            Ray ray = new Ray(xrRayInteractor.transform.position, xrRayInteractor.transform.forward);
-            for (int i = 0; i < N; i++)
-            {
-                if(vertexbounds[i].IntersectRay(ray, out float intersectionDistance))
-                {
-                    if (intersectionDistance < 10f && ablationNodes.Count <= 100)
-                    {
-                        Debug.Log("intersection distance " + intersectionDistance);
-                        ablationNodes.Add(i);
-                        Debug.Log(ablationNodes.Count + "/100, touching ablation node " + i);
-                    }
-                }
-            }
         }
         else
         {
             isAblation.text = "Trigger Mode";
-            Ray ray = new Ray(xrRayInteractor.transform.position, xrRayInteractor.transform.forward);
-            for (int i = 0; i < N; i++)
+        }
+
+        Ray ray = new Ray(xrRayInteractor.transform.position, xrRayInteractor.transform.forward);
+        for (int i = 0; i < N; i++)
+        {
+            if (vertexbounds[i].IntersectRay(ray, out float intersectionDistance))
             {
-                if (vertexbounds[i].IntersectRay(ray, out float intersectionDistance))
+                if (intersectionDistance < 10f)
                 {
-                    if (intersectionDistance < 10f && triggerCurrNum < 10)
-                    {
-                        Debug.Log("intersection distance " + intersectionDistance);
-                        triggerNodes[triggerCurrNum] = i;
-                        triggerTime[triggerCurrNum] = tt;
-                        triggerCurrNum += 1;
-                        Debug.Log(triggerCurrNum + "/10, node " + i + " as trigger");
-                    }
+                    // Debug.Log("intersection distance " + intersectionDistance);
+                    rayNode = i;
                 }
+                break;
             }
         }
 
+        bool triggerValue;
+        if (_inputData._rightController.TryGetFeatureValue(UnityEngine.XR.CommonUsages.triggerButton, out triggerValue) && triggerValue && rayNode > 0)
+        {
+            Debug.Log(triggerValue + " Trigger button is pressed. ");
+            if (isParameterEnabled && !inTriggerNodes(rayNode) && ablationNodes.Count < 100)
+            {
+                ablationNodes.Add(rayNode);
+                Debug.Log(ablationNodes.Count + "/100, touching ablation node " + rayNode);
+                ablationText.text = "Ablation Nodes Count: " + ablationNodes.Count + "/100";
+            }
+            else if(!isParameterEnabled && !inAblationNodes(rayNode) && triggerNodes.Count < 10)
+            {
+                triggerNodes.Add(rayNode);
+                triggerTime[triggerNodes.Count - 1] = tt;
+                // triggerCurrNum ++;
+                Debug.Log(triggerNodes.Count + "/10, node " + rayNode + " as trigger");
+                triggerText.text = "Trigger Nodes Count: " + triggerNodes.Count + "/10";
+            }
+        }
 
+        
         if (_inputData._rightController.TryGetFeatureValue(CommonUsages.devicePosition, out Vector3 rightPosition))
         {
             rightControllerPosition.text = "Right Controller Position: "+ rightPosition.ToString("F2");
