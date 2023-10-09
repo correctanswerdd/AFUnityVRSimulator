@@ -69,7 +69,7 @@ public class CardiacSimulation : MonoBehaviour
         for (int i = 0; i < str.Length; i++)
         {
             string[] ss = str[i].Split(',');
-            vertices[i] = new Vector3(float.Parse(ss[0]), float.Parse(ss[1]), float.Parse(ss[2]));
+            vertices[i] = new Vector3(float.Parse(ss[0]) - 77f, float.Parse(ss[1]), float.Parse(ss[2]) - 32);
             //Debug.Log("(" + float.Parse(ss[0]) * 0.1f + "," + float.Parse(ss[1]) * 0.1f + "," + float.Parse(ss[2]) * 0.1f + ")");
         }
         Debug.Log("Load vertices " + str.Length);
@@ -88,7 +88,7 @@ public class CardiacSimulation : MonoBehaviour
 
     public Color GenerateColor(float a, float b, float c)
     {
-        Color color = new Color(a, b, c);
+        Color color = new Color(a, b, c, 0.7f);
         return color;
     }
 
@@ -219,6 +219,14 @@ public class CardiacSimulation : MonoBehaviour
     private HashSet<int> ablationNodes;
     private HashSet<int> triggerNodes;
     private int triggerCurrNum = 0; // trigger number <= 10
+    private GameObject ablationNodeSquare;
+    private Material ablationNodeMaterial;
+    private MeshFilter ablationNodeMeshFilter;
+    private MeshRenderer ablationNodeMeshRenderer;
+    private GameObject triggerNodeSquare;
+    private Material triggerNodeMaterial;
+    private MeshFilter triggerNodeMeshFilter;
+    private MeshRenderer triggerNodeMeshRenderer;
 
     private Matrix<double> m_lap;
     private Vector<double> y;
@@ -231,6 +239,10 @@ public class CardiacSimulation : MonoBehaviour
     private int rayNode = -1;
 
     private GameObject rightHandController;
+    private GameObject touchNodeSquare;
+    private Material touchNodeSquareMaterial;
+    private MeshFilter touchNodeSquareMeshFilter;
+    private MeshRenderer touchNodeSquareMeshRenderer;
     private XRRayInteractor xrRayInteractor;
     private Bounds[] vertexbounds;
 
@@ -245,6 +257,11 @@ public class CardiacSimulation : MonoBehaviour
     private Text triggerText;
     private Text ablationText;
     private Text rightControllerPosition;
+
+    private Quaternion initialObjectRotation;
+    private Quaternion initialControllerRotation;
+    private Quaternion controllerRotation;
+    private bool rotationSet = false;
 
 
     // Start is called before the first frame update
@@ -314,14 +331,6 @@ public class CardiacSimulation : MonoBehaviour
         membranePotentials = new double[N];
         gatingVariables = new double[N];
 
-        // create new colors array where the colors will be created.
-        /*Color[] colors = new Color[vertices.Length];
-
-        for (int i = 0; i < vertices.Length; i++)
-            colors[i] = Color.Lerp(Color.red, Color.green, vertices[i].y);
-
-        // assign the array of colors to the Mesh.
-        mesh.colors = colors;*/
 
         // MeshFilter
         meshFilter = temp.GetComponent<MeshFilter>();
@@ -365,10 +374,14 @@ public class CardiacSimulation : MonoBehaviour
         {
             vertexbounds[i] = new Bounds(vertices[i], new Vector3(2, 2, 2));
         }
-            
+
 
         // start
         // Application.targetFrameRate = 60;
+
+        touchNodeSquare = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        touchNodeSquareMaterial = touchNodeSquare.GetComponent<MeshRenderer>().material;
+        touchNodeSquare.transform.localScale = new Vector3(2f, 2f, 2f);
     }
 
     public int[] Advance_realtime(double tt, double dt)
@@ -487,6 +500,10 @@ public class CardiacSimulation : MonoBehaviour
 
     void Update()
     {
+
+        // transform.RotateAround(this.transform.position, Vector3.up, 20 * Time.deltaTime);
+
+        touchNodeSquare.SetActive(false);
         // laplacian = ComputeLaplacian();
         if (tt < 4800)
         {
@@ -496,15 +513,40 @@ public class CardiacSimulation : MonoBehaviour
             tt += dt;
 
             if (rayNode > 0)
+            {
+                if (isParameterEnabled)
+                    touchNodeSquareMaterial.color = Color.grey;
+                else
+                    touchNodeSquareMaterial.color = Color.red;
+                touchNodeSquare.transform.position = vertices[rayNode];
+                touchNodeSquare.SetActive(true);
                 color_idx[rayNode] = 64;
-
+            }
+                
             // ablation nodes visualization
             foreach (int i in ablationNodes)
-                color_idx[i] = 25;
+            {
+                ablationNodeSquare = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                ablationNodeMaterial = ablationNodeSquare.GetComponent<MeshRenderer>().material;
+                ablationNodeSquare.transform.localScale = new Vector3(4f, 4f, 4f);
+                ablationNodeMaterial.color = Color.grey;
+                ablationNodeSquare.transform.position = vertices[i];
+                ablationNodeSquare.SetActive(true);
+                //color_idx[i] = 25;
+            } 
 
             // trigger nodes visualization
             foreach (int i in triggerNodes)
-                color_idx[i] = 55;
+            {
+                triggerNodeSquare = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                triggerNodeMaterial = triggerNodeSquare.GetComponent<MeshRenderer>().material;
+                triggerNodeSquare.transform.localScale = new Vector3(4f, 4f, 4f);
+                triggerNodeMaterial.color = Color.red;
+                triggerNodeSquare.transform.position = vertices[i];
+                triggerNodeSquare.SetActive(true);
+                //color_idx[i] = 55;
+            }
+                
 
             color_idx[saNodeVertexIndex] = 55;
 
@@ -512,6 +554,7 @@ public class CardiacSimulation : MonoBehaviour
             ShowGameObject(triangles, mesh, meshRenderer, materials_get, color_idx);
             ShowGameObject(triangles, mesh_flip, meshRenderer_flip, materials_get_flip, color_idx);
             rayNode = -1;
+            
 
             if (tt == 4800)
                 tt = 0;
@@ -555,7 +598,7 @@ public class CardiacSimulation : MonoBehaviour
                 Debug.Log(ablationNodes.Count + "/100, touching ablation node " + rayNode);
                 ablationText.text = "Ablation Nodes Count: " + ablationNodes.Count + "/100";
             }
-            else if(!isParameterEnabled && !inAblationNodes(rayNode) && triggerNodes.Count < 10)
+            else if (!isParameterEnabled && !inAblationNodes(rayNode) && triggerNodes.Count < 10)
             {
                 triggerNodes.Add(rayNode);
                 triggerTime[triggerNodes.Count - 1] = tt;
@@ -563,9 +606,50 @@ public class CardiacSimulation : MonoBehaviour
                 Debug.Log(triggerNodes.Count + "/10, node " + rayNode + " as trigger");
                 triggerText.text = "Trigger Nodes Count: " + triggerNodes.Count + "/10";
             }
+
         }
 
-        
+
+        if (_inputData._rightController.TryGetFeatureValue(UnityEngine.XR.CommonUsages.triggerButton, out triggerValue) && triggerValue)
+        {
+            Debug.Log(triggerValue + " Trigger button is pressed. ");
+            if (rotationSet == false)
+            {
+                initialObjectRotation = transform.rotation;
+                if (_inputData._rightController.TryGetFeatureValue(CommonUsages.deviceRotation, out controllerRotation))
+                {
+                    rotationSet = true;
+                    initialControllerRotation = controllerRotation;
+                    Debug.Log(triggerValue + " Trigger button is pressed. " + initialControllerRotation.ToString("F2") + rotationSet);
+                }
+            }
+
+            if (_inputData._rightController.TryGetFeatureValue(CommonUsages.deviceRotation, out controllerRotation))
+            {
+ 
+                Quaternion controllerAngularDifference = initialControllerRotation * Quaternion.Inverse(controllerRotation);
+                //transform.rotation = initialControllerRotation;
+                //transform.rotation = controllerAngularDifference * initialObjectRotation;
+
+                Quaternion myQuaternion = controllerAngularDifference * initialObjectRotation;
+
+                float angle = 0.0f;
+                Vector3 axis = Vector3.up;
+                myQuaternion.ToAngleAxis(out angle, out axis);
+                Debug.Log(angle + axis.ToString("F2"));
+
+                myQuaternion *= Quaternion.Euler(Vector3.up);
+                transform.rotation = Quaternion.AngleAxis(angle, Vector3.up);
+                //transform.rotation = myQuaternion;
+                Debug.Log(triggerValue + " Trigger button is pressed. " + myQuaternion.ToString("F2"));
+
+                //transform.RotateAround(this.transform.position, Vector3.up, controllerAngularDifference * initialObjectRotation);
+            }
+        }
+        else
+            rotationSet = false;
+
+
         if (_inputData._rightController.TryGetFeatureValue(CommonUsages.devicePosition, out Vector3 rightPosition))
         {
             rightControllerPosition.text = "Right Controller Position: "+ rightPosition.ToString("F2");
