@@ -191,7 +191,7 @@ public class CardiacSimulation : MonoBehaviour
     private double stimulusTime = 0f;   // time to apply stimulus (in seconds)
     private double[] triggerTime = new double[10];   // time for trigger
     private double stimulusDuration = 10f;   // duration of stimulus (in seconds)
-    private int saNodeVertexIndex = 295;   // index of SA node vertex in mesh
+    private int saNodeVertexIndex = 432;   // index of SA node vertex in mesh
 
     private double[][] laplacian;  // Compute Laplacian operator
     private double[,] lapp;
@@ -217,7 +217,7 @@ public class CardiacSimulation : MonoBehaviour
     private bool isParameterEnabled;
 
     private HashSet<int> ablationNodes;
-    private HashSet<int> triggerNodes; 
+    private HashSet<int> triggerNodes;
     private int triggerCurrNum = 0; // trigger number <= 10
 
     private Matrix<double> m_lap;
@@ -314,6 +314,15 @@ public class CardiacSimulation : MonoBehaviour
         membranePotentials = new double[N];
         gatingVariables = new double[N];
 
+        // create new colors array where the colors will be created.
+        /*Color[] colors = new Color[vertices.Length];
+
+        for (int i = 0; i < vertices.Length; i++)
+            colors[i] = Color.Lerp(Color.red, Color.green, vertices[i].y);
+
+        // assign the array of colors to the Mesh.
+        mesh.colors = colors;*/
+
         // MeshFilter
         meshFilter = temp.GetComponent<MeshFilter>();
         if (meshFilter == null) meshFilter = temp.AddComponent<MeshFilter>();
@@ -400,9 +409,10 @@ public class CardiacSimulation : MonoBehaviour
             idx = findPositiveIndexVector(laplacian[saNodeVertexIndex]); //stimulate SA node every heart cycle 'T'
             //double[] Iex = setSubVector<double>(idx, stimulusStrength);
             //I_ext = Vector<double>.Build.DenseOfArray(Iex);
+            foreach (int i in idx)
+                Iex[i] = stimulusStrength;
         }
-        foreach (int i in idx)
-            Iex[i] = stimulusStrength;
+        
         /*for(int i = 0; i < triggerCurrNum; i++)
         {
             double trigTime = triggerTime[i];
@@ -412,14 +422,21 @@ public class CardiacSimulation : MonoBehaviour
         int trigID = 0;
         foreach (int node in triggerNodes)
         {
+            Debug.Log("Trigger node: " + node);
+        }
+        
+        foreach (int node in triggerNodes)
+        {
             double trigTime = triggerTime[trigID];
             if (tt >= trigTime && tt <= trigTime + stimulusDuration)
+            {
                 idx = findPositiveIndexVector(laplacian[node]);
+                foreach (int i in idx)
+                    Iex[i] = triggerStrength;
+            }  
             trigID++;
         }
-            
-        foreach (int i in idx)
-            Iex[i] = triggerStrength;
+        
         I_ext = Vector<double>.Build.DenseOfArray(Iex);
         dydt = ComputeDerivatives(y, m_lap, I_ext);
 
@@ -489,10 +506,15 @@ public class CardiacSimulation : MonoBehaviour
             foreach (int i in triggerNodes)
                 color_idx[i] = 55;
 
+            color_idx[saNodeVertexIndex] = 55;
+
             // visualize
             ShowGameObject(triangles, mesh, meshRenderer, materials_get, color_idx);
             ShowGameObject(triangles, mesh_flip, meshRenderer_flip, materials_get_flip, color_idx);
             rayNode = -1;
+
+            if (tt == 4800)
+                tt = 0;
         }
 
         /*if (Input.GetKeyDown(KeyCode.Space))
