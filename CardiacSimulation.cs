@@ -219,12 +219,12 @@ public class CardiacSimulation : MonoBehaviour
     private HashSet<int> ablationNodes;
     private HashSet<int> triggerNodes;
     private int triggerCurrNum = 0; // trigger number <= 10
-    private GameObject ablationNodeSquare;
-    private Material ablationNodeMaterial;
+    private GameObject[] ablationNodeSquare;
+    private Material[] ablationNodeMaterial;
     private MeshFilter ablationNodeMeshFilter;
     private MeshRenderer ablationNodeMeshRenderer;
-    private GameObject triggerNodeSquare;
-    private Material triggerNodeMaterial;
+    private GameObject[] triggerNodeSquare;
+    private Material[] triggerNodeMaterial;
     private MeshFilter triggerNodeMeshFilter;
     private MeshRenderer triggerNodeMeshRenderer;
 
@@ -369,12 +369,6 @@ public class CardiacSimulation : MonoBehaviour
         ablationNodes = new HashSet<int>();
         triggerNodes = new HashSet<int>();
 
-        vertexbounds = new Bounds[N];
-        for(int i = 0; i < N; i ++)
-        {
-            vertexbounds[i] = new Bounds(vertices[i], new Vector3(2, 2, 2));
-        }
-
 
         // start
         // Application.targetFrameRate = 60;
@@ -382,6 +376,28 @@ public class CardiacSimulation : MonoBehaviour
         touchNodeSquare = GameObject.CreatePrimitive(PrimitiveType.Sphere);
         touchNodeSquareMaterial = touchNodeSquare.GetComponent<MeshRenderer>().material;
         touchNodeSquare.transform.localScale = new Vector3(2f, 2f, 2f);
+
+        ablationNodeSquare = new GameObject[100];
+        ablationNodeMaterial = new Material[100];
+        for (int i = 0; i < 100; i++)
+        {
+            ablationNodeSquare[i] = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            ablationNodeMaterial[i] = ablationNodeSquare[i].GetComponent<MeshRenderer>().material;
+            ablationNodeSquare[i].transform.localScale = new Vector3(4f, 4f, 4f);
+            ablationNodeMaterial[i].color = Color.grey;
+            ablationNodeSquare[i].SetActive(false);
+        }
+
+        triggerNodeSquare = new GameObject[10];
+        triggerNodeMaterial = new Material[10];
+        for (int i = 0; i < 10; i++)
+        {
+            triggerNodeSquare[i] = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            triggerNodeMaterial[i] = triggerNodeSquare[i].GetComponent<MeshRenderer>().material;
+            triggerNodeSquare[i].transform.localScale = new Vector3(4f, 4f, 4f);
+            triggerNodeMaterial[i].color = Color.red;
+            triggerNodeSquare[i].SetActive(false);
+        }
     }
 
     public int[] Advance_realtime(double tt, double dt)
@@ -500,6 +516,11 @@ public class CardiacSimulation : MonoBehaviour
 
     void Update()
     {
+        vertexbounds = new Bounds[N];
+        for (int i = 0; i < N; i++)
+        {
+            vertexbounds[i] = new Bounds(vertices[i], new Vector3(2, 2, 2));
+        }
 
         // transform.RotateAround(this.transform.position, Vector3.up, 20 * Time.deltaTime);
 
@@ -522,28 +543,24 @@ public class CardiacSimulation : MonoBehaviour
                 touchNodeSquare.SetActive(true);
                 color_idx[rayNode] = 64;
             }
-                
+
             // ablation nodes visualization
+            int j = 0;
             foreach (int i in ablationNodes)
             {
-                ablationNodeSquare = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                ablationNodeMaterial = ablationNodeSquare.GetComponent<MeshRenderer>().material;
-                ablationNodeSquare.transform.localScale = new Vector3(4f, 4f, 4f);
-                ablationNodeMaterial.color = Color.grey;
-                ablationNodeSquare.transform.position = vertices[i];
-                ablationNodeSquare.SetActive(true);
+                ablationNodeSquare[j].transform.position = vertices[i];
+                ablationNodeSquare[j].SetActive(true);
+                j++;
                 //color_idx[i] = 25;
-            } 
+            }
 
             // trigger nodes visualization
+            j = 0;
             foreach (int i in triggerNodes)
             {
-                triggerNodeSquare = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                triggerNodeMaterial = triggerNodeSquare.GetComponent<MeshRenderer>().material;
-                triggerNodeSquare.transform.localScale = new Vector3(4f, 4f, 4f);
-                triggerNodeMaterial.color = Color.red;
-                triggerNodeSquare.transform.position = vertices[i];
-                triggerNodeSquare.SetActive(true);
+                triggerNodeSquare[j].transform.position = vertices[i];
+                triggerNodeSquare[j].SetActive(true);
+                j++; 
                 //color_idx[i] = 55;
             }
                 
@@ -620,7 +637,7 @@ public class CardiacSimulation : MonoBehaviour
                 {
                     rotationSet = true;
                     initialControllerRotation = controllerRotation;
-                    Debug.Log(triggerValue + " Trigger button is pressed. " + initialControllerRotation.ToString("F2") + rotationSet);
+                    //Debug.Log(triggerValue + " Trigger button is pressed. " + initialControllerRotation.ToString("F2") + rotationSet);
                 }
             }
 
@@ -640,8 +657,14 @@ public class CardiacSimulation : MonoBehaviour
 
                 myQuaternion *= Quaternion.Euler(Vector3.up);
                 transform.rotation = Quaternion.AngleAxis(angle, Vector3.up);
+
+                for (int i = 0; i < vertices.Length; i++)
+                {//vertices being the array of vertices of your mesh
+                    vertices[i] = transform.TransformPoint(meshFilter.mesh.vertices[i]); //Quaternion.AngleAxis(angle, Vector3.up) * vertices[i];
+                }
+
                 //transform.rotation = myQuaternion;
-                Debug.Log(triggerValue + " Trigger button is pressed. " + myQuaternion.ToString("F2"));
+                Debug.Log(triggerValue + " Trigger button is pressed. " + angle);
 
                 //transform.RotateAround(this.transform.position, Vector3.up, controllerAngularDifference * initialObjectRotation);
             }
