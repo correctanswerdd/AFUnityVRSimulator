@@ -27,7 +27,7 @@ public class CardiacSimulation : MonoBehaviour
             string[] ss = str[i].Split(',');
             triangles[i] = new int[] { Int32.Parse(ss[0]), Int32.Parse(ss[1]), Int32.Parse(ss[2]) };
         }
-        Debug.Log("Load faces "+str.Length);
+        Debug.Log("Load faces " + str.Length);
         return triangles;
     }
 
@@ -40,7 +40,7 @@ public class CardiacSimulation : MonoBehaviour
         {
             string[] ss = str[i].Split(',');
             triangles[i] = new int[] { Int32.Parse(ss[0]), Int32.Parse(ss[1]), Int32.Parse(ss[2]) };
-            triangles[i + 1] = new int[] { Int32.Parse(ss[0]), Int32.Parse(ss[2]), Int32.Parse(ss[1])};
+            triangles[i + 1] = new int[] { Int32.Parse(ss[0]), Int32.Parse(ss[2]), Int32.Parse(ss[1]) };
         }
         Debug.Log("Load all faces " + str.Length * 2);
         return triangles;
@@ -88,7 +88,7 @@ public class CardiacSimulation : MonoBehaviour
 
     public Color GenerateColor(float a, float b, float c)
     {
-        Color color = new Color(a, b, c, 0.7f);
+        Color color = new Color(a, b, c, 1f);
         return color;
     }
 
@@ -181,8 +181,8 @@ public class CardiacSimulation : MonoBehaviour
     private double tt = 0f;
     private double dt = 0.5f;//0.5f;   // time step
     private double a = 0.12f;      // FHN parameters 
-    private double b = 0.013f;     
-    private double c1 = 0.26f;      
+    private double b = 0.013f;
+    private double c1 = 0.26f;
     private double c2 = 0.1f;
     private double d = 1.0f;
     private double delta = 0.6f;
@@ -205,6 +205,7 @@ public class CardiacSimulation : MonoBehaviour
     private int[][] triangles;
     private int[][] triangles_flip;
     private Vector3[] vertices;
+    private int[] color_idx; // vertices color id
     private Bounds SANodebounds;
     private Material[] materials_get;
     private Material[] materials_get_flip;
@@ -235,7 +236,6 @@ public class CardiacSimulation : MonoBehaviour
     private Vector<double> I_ext;
     private Vector<double> dydt;
     private Vector<double> y_next;
-    private int[] color_idx;
     private int rayNode = -1;
 
     private GameObject rightHandController;
@@ -326,6 +326,7 @@ public class CardiacSimulation : MonoBehaviour
         {
             mesh.SetTriangles(triangles[i], i);
         }
+
         N = mesh.vertices.Length;
         NF = mesh.subMeshCount;
         membranePotentials = new double[N];
@@ -346,7 +347,7 @@ public class CardiacSimulation : MonoBehaviour
         GameObject temp_flip = new GameObject();
         temp_flip.name = "flip";
         temp_flip.transform.parent = this.transform;
-        materials_get_flip = SetColors(temp_flip);
+        //materials_get_flip = SetColors(temp_flip);
         triangles_flip = LoadFaces_flip();
         mesh_flip = new Mesh();
         mesh_flip.vertices = vertices;
@@ -375,7 +376,7 @@ public class CardiacSimulation : MonoBehaviour
 
         touchNodeSquare = GameObject.CreatePrimitive(PrimitiveType.Sphere);
         touchNodeSquareMaterial = touchNodeSquare.GetComponent<MeshRenderer>().material;
-        touchNodeSquare.transform.localScale = new Vector3(2f, 2f, 2f);
+        touchNodeSquare.transform.localScale = new Vector3(4f, 4f, 4f);
 
         ablationNodeSquare = new GameObject[100];
         ablationNodeMaterial = new Material[100];
@@ -383,7 +384,7 @@ public class CardiacSimulation : MonoBehaviour
         {
             ablationNodeSquare[i] = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             ablationNodeMaterial[i] = ablationNodeSquare[i].GetComponent<MeshRenderer>().material;
-            ablationNodeSquare[i].transform.localScale = new Vector3(4f, 4f, 4f);
+            ablationNodeSquare[i].transform.localScale = new Vector3(2f, 2f, 2f);
             ablationNodeMaterial[i].color = Color.grey;
             ablationNodeSquare[i].SetActive(false);
         }
@@ -394,10 +395,12 @@ public class CardiacSimulation : MonoBehaviour
         {
             triggerNodeSquare[i] = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             triggerNodeMaterial[i] = triggerNodeSquare[i].GetComponent<MeshRenderer>().material;
-            triggerNodeSquare[i].transform.localScale = new Vector3(4f, 4f, 4f);
+            triggerNodeSquare[i].transform.localScale = new Vector3(2f, 2f, 2f);
             triggerNodeMaterial[i].color = Color.red;
             triggerNodeSquare[i].SetActive(false);
         }
+
+        color_idx = new int[vertices.Length];
     }
 
     public int[] Advance_realtime(double tt, double dt)
@@ -412,7 +415,7 @@ public class CardiacSimulation : MonoBehaviour
             if (ablationNodes.Contains(i))
                 continue;
             int[] k = findNonZeroIndexVector(laplacian[i]);
-            foreach(int j in k)
+            foreach (int j in k)
             {
                 if (ablationNodes.Contains(j))
                     continue;
@@ -441,7 +444,7 @@ public class CardiacSimulation : MonoBehaviour
             foreach (int i in idx)
                 Iex[i] = stimulusStrength;
         }
-        
+
         /*for(int i = 0; i < triggerCurrNum; i++)
         {
             double trigTime = triggerTime[i];
@@ -453,7 +456,7 @@ public class CardiacSimulation : MonoBehaviour
         {
             Debug.Log("Trigger node: " + node);
         }
-        
+
         foreach (int node in triggerNodes)
         {
             double trigTime = triggerTime[trigID];
@@ -462,10 +465,10 @@ public class CardiacSimulation : MonoBehaviour
                 idx = findPositiveIndexVector(laplacian[node]);
                 foreach (int i in idx)
                     Iex[i] = triggerStrength;
-            }  
+            }
             trigID++;
         }
-        
+
         I_ext = Vector<double>.Build.DenseOfArray(Iex);
         dydt = ComputeDerivatives(y, m_lap, I_ext);
 
@@ -484,8 +487,8 @@ public class CardiacSimulation : MonoBehaviour
         m = m.PointwiseMaximum(ones); // m = max(m, 1); 
         m = m.PointwiseMinimum(sixtyfour); // min(m, 64);
         double[] v_colors = (m - 1).ToArray();
-        int[] color_idx = v_colors.Select(d => (int)d).ToArray(); // convert a double array to integer one
-        return color_idx;
+        int[] color_idxx = v_colors.Select(d => (int)d).ToArray(); // convert a double array to integer one
+        return color_idxx;
     }
 
     private void ButtonClicked()
@@ -528,8 +531,9 @@ public class CardiacSimulation : MonoBehaviour
         // laplacian = ComputeLaplacian();
         if (tt < 4800)
         {
-            int[] color_idx = Advance_realtime(tt, dt);
-            
+            color_idx = Advance_realtime(tt, dt);
+            //color_idx[Convert.ToInt32(tt)] = 55;
+
             // Update the current time
             tt += dt;
 
@@ -560,18 +564,19 @@ public class CardiacSimulation : MonoBehaviour
             {
                 triggerNodeSquare[j].transform.position = vertices[i];
                 triggerNodeSquare[j].SetActive(true);
-                j++; 
+                j++;
                 //color_idx[i] = 55;
             }
-                
+
 
             color_idx[saNodeVertexIndex] = 55;
 
             // visualize
-            ShowGameObject(triangles, mesh, meshRenderer, materials_get, color_idx);
-            ShowGameObject(triangles, mesh_flip, meshRenderer_flip, materials_get_flip, color_idx);
+            int[] face_color_idx = ColorV2F(color_idx, triangles);
+            ShowGameObject(mesh, meshRenderer, materials_get, face_color_idx);
+            ShowGameObject(mesh_flip, meshRenderer_flip, materials_get, face_color_idx);
             rayNode = -1;
-            
+
 
             if (tt == 4800)
                 tt = 0;
@@ -643,7 +648,7 @@ public class CardiacSimulation : MonoBehaviour
 
             if (_inputData._rightController.TryGetFeatureValue(CommonUsages.deviceRotation, out controllerRotation))
             {
- 
+
                 Quaternion controllerAngularDifference = initialControllerRotation * Quaternion.Inverse(controllerRotation);
                 //transform.rotation = initialControllerRotation;
                 //transform.rotation = controllerAngularDifference * initialObjectRotation;
@@ -675,7 +680,7 @@ public class CardiacSimulation : MonoBehaviour
 
         if (_inputData._rightController.TryGetFeatureValue(CommonUsages.devicePosition, out Vector3 rightPosition))
         {
-            rightControllerPosition.text = "Right Controller Position: "+ rightPosition.ToString("F2");
+            rightControllerPosition.text = "Right Controller Position: " + rightPosition.ToString("F2");
         }
         if (_inputData._leftController.TryGetFeatureValue(CommonUsages.devicePosition, out Vector3 leftPosition))
         {
@@ -696,14 +701,13 @@ public class CardiacSimulation : MonoBehaviour
         return result;
     }
 
-    private void ShowGameObject(int[][] faces, Mesh mesh, MeshRenderer meshRenderer, Material[] materials_get, int[] verticesColor)
+    private void ShowGameObject(Mesh mesh, MeshRenderer meshRenderer, Material[] materials_get, int[] faceColor)
     {
         // Debug.Log("ShowGameObject");
-        int[] color_idx = ColorV2F(verticesColor, faces);
         Material[] materials_push = new Material[mesh.subMeshCount];
         for (int i = 0; i < mesh.subMeshCount; i++)
         {
-            materials_push[i] = materials_get[color_idx[i]];
+            materials_push[i] = materials_get[faceColor[i]];
         }
         meshRenderer.materials = materials_push;
     }
@@ -798,5 +802,4 @@ public class CardiacSimulation : MonoBehaviour
         return dydt;
     }
 }
-
 
