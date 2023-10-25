@@ -76,6 +76,21 @@ public class CardiacSimulation : MonoBehaviour
         return vertices;
     }
 
+    Vector3[] LoadVertices_flip()
+    {
+        TextAsset txt = Resources.Load("vertices") as TextAsset;
+        string[] str = txt.text.Split('\n');
+        Vector3[] vertices = new Vector3[str.Length];
+        for (int i = 0; i < str.Length; i++)
+        {
+            string[] ss = str[i].Split(',');
+            vertices[i] = new Vector3(float.Parse(ss[0]), float.Parse(ss[1]), float.Parse(ss[2]) - 32);
+            //Debug.Log("(" + float.Parse(ss[0]) * 0.1f + "," + float.Parse(ss[1]) * 0.1f + "," + float.Parse(ss[2]) * 0.1f + ")");
+        }
+        Debug.Log("Load vertices " + str.Length);
+        return vertices;
+    }
+
     int[] ColorV2F(int[] verticesColor, int[][] faces)
     {
         int[] colorList = new int[faces.GetLength(0)];
@@ -88,7 +103,7 @@ public class CardiacSimulation : MonoBehaviour
 
     public Color GenerateColor(float a, float b, float c)
     {
-        Color color = new Color(a, b, c, 1f);
+        Color color = new Color(a, b, c, 0.9f);
         return color;
     }
 
@@ -96,13 +111,15 @@ public class CardiacSimulation : MonoBehaviour
     {
         // Material[] materials = new Material[num_color];
         Material[] materials = temp.transform.parent.GetComponent<MeshRenderer>().materials;
-        TextAsset txt = Resources.Load("colormap") as TextAsset;
+        TextAsset txt = Resources.Load("colormap_coolwarm") as TextAsset;
         string[] str = txt.text.Split('\n');
         for (int i = 0; i < str.Length; i++)
         {
             string[] ss = str[i].Split(',');
             materials[i].color = GenerateColor(float.Parse(ss[0]), float.Parse(ss[1]), float.Parse(ss[2]));
+            colorMap[i] = GenerateColor(float.Parse(ss[0]), float.Parse(ss[1]), float.Parse(ss[2]));
         }
+        colorMap[64] = Color.white;
         return materials;
     }
 
@@ -198,6 +215,7 @@ public class CardiacSimulation : MonoBehaviour
 
     private Mesh mesh;   // mesh of heart object
     private Mesh mesh_flip;
+    private Mesh mesh_flip_flip;
     private int N;   // number of vertices in mesh
     private int NF; // number of faces in mesh
     private double[] membranePotentials;   // membrane potentials of vertices
@@ -207,12 +225,15 @@ public class CardiacSimulation : MonoBehaviour
     private Vector3[] vertices;
     private int[] color_idx; // vertices color id
     private Bounds SANodebounds;
+    private Color[] colorMap;
     private Material[] materials_get;
     private Material[] materials_get_flip;
     private MeshFilter meshFilter;
     private MeshFilter meshFilter_flip;
+    private MeshFilter meshFilter_flip_flip;
     private MeshRenderer meshRenderer;
     private MeshRenderer meshRenderer_flip;
+    private MeshRenderer meshRenderer_flip_flip;
 
     private InputData _inputData;
     private bool isParameterEnabled;
@@ -310,6 +331,7 @@ public class CardiacSimulation : MonoBehaviour
         isParameterEnabled = true;
 
         // Obj
+        colorMap = new Color[65];
         GameObject temp = new GameObject();
         temp.name = "parent";
         temp.transform.parent = this.transform;
@@ -319,6 +341,7 @@ public class CardiacSimulation : MonoBehaviour
 
         //SANodebounds = new Bounds(vertices[saNodeVertexIndex], 5);
 
+        // Obj
         mesh = new Mesh();
         mesh.vertices = vertices;
         mesh.subMeshCount = triangles.Length;
@@ -332,19 +355,16 @@ public class CardiacSimulation : MonoBehaviour
         membranePotentials = new double[N];
         gatingVariables = new double[N];
 
-
-        // MeshFilter
         meshFilter = temp.GetComponent<MeshFilter>();
         if (meshFilter == null) meshFilter = temp.AddComponent<MeshFilter>();
         meshFilter.mesh = mesh;
 
-        // MeshRenderer
         meshRenderer = temp.GetComponent<MeshRenderer>();
         if (meshRenderer == null) meshRenderer = temp.AddComponent<MeshRenderer>();
 
 
         // Flip Obj
-        GameObject temp_flip = new GameObject();
+        /*GameObject temp_flip = new GameObject();
         temp_flip.name = "flip";
         temp_flip.transform.parent = this.transform;
         //materials_get_flip = SetColors(temp_flip);
@@ -357,14 +377,30 @@ public class CardiacSimulation : MonoBehaviour
             mesh_flip.SetTriangles(triangles_flip[i], i);
         }
 
-        // MeshFilter
         meshFilter_flip = temp_flip.GetComponent<MeshFilter>();
         if (meshFilter_flip == null) meshFilter_flip = temp_flip.AddComponent<MeshFilter>();
         meshFilter_flip.mesh = mesh_flip;
 
-        // MeshRenderer
         meshRenderer_flip = temp_flip.GetComponent<MeshRenderer>();
         if (meshRenderer_flip == null) meshRenderer_flip = temp_flip.AddComponent<MeshRenderer>();
+
+
+        // Flip flip Obj
+        GameObject temp_flip_flip = new GameObject();
+        temp_flip_flip.name = "flip flip";
+        temp_flip_flip.transform.parent = this.transform;
+        mesh_flip_flip = new Mesh();
+        mesh_flip_flip.vertices = LoadVertices_flip();
+        mesh_flip_flip.subMeshCount = triangles_flip.Length;
+        for (int i = 0; i < mesh_flip_flip.subMeshCount; i++)
+            mesh_flip_flip.SetTriangles(triangles_flip[i], i);
+
+        meshFilter_flip_flip = temp_flip_flip.GetComponent<MeshFilter>();
+        if (meshFilter_flip_flip == null) meshFilter_flip_flip = temp_flip_flip.AddComponent<MeshFilter>();
+        meshFilter_flip_flip.mesh = mesh_flip_flip;
+
+        meshRenderer_flip_flip = temp_flip_flip.GetComponent<MeshRenderer>();
+        if (meshRenderer_flip_flip == null) meshRenderer_flip_flip = temp_flip_flip.AddComponent<MeshRenderer>();*/
 
         laplacian = ComputeLaplacian();
         ablationNodes = new HashSet<int>();
@@ -401,6 +437,7 @@ public class CardiacSimulation : MonoBehaviour
         }
 
         color_idx = new int[vertices.Length];
+
     }
 
     public int[] Advance_realtime(double tt, double dt)
@@ -572,9 +609,22 @@ public class CardiacSimulation : MonoBehaviour
             color_idx[saNodeVertexIndex] = 55;
 
             // visualize
+            /*Color[] verticeColors = new Color[vertices.Length];
+            for (int i = 0; i < vertices.Length; i++)
+                verticeColors[i] = colorMap[color_idx[i]];
+            mesh.SetColors(verticeColors);
+            meshFilter.mesh = mesh;
+            Material[] materials_push = new Material[mesh.subMeshCount];
+            for (int i = 0; i < mesh.subMeshCount; i++)
+            {
+                materials_push[i] = materials_get[0];
+            }
+            meshRenderer.materials = materials_push;*/
+
             int[] face_color_idx = ColorV2F(color_idx, triangles);
             ShowGameObject(mesh, meshRenderer, materials_get, face_color_idx);
-            ShowGameObject(mesh_flip, meshRenderer_flip, materials_get, face_color_idx);
+            //ShowGameObject(mesh_flip, meshRenderer_flip, materials_get, face_color_idx);
+            //ShowGameObject(mesh_flip_flip, meshRenderer_flip_flip, materials_get, face_color_idx);
             rayNode = -1;
 
 
