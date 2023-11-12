@@ -111,7 +111,7 @@ public class CardiacSimulation : MonoBehaviour
     {
         // Material[] materials = new Material[num_color];
         Material[] materials = temp.transform.parent.GetComponent<MeshRenderer>().materials;
-        TextAsset txt = Resources.Load("colormap_coolwarm") as TextAsset;
+        TextAsset txt = Resources.Load("colormap_Spectral") as TextAsset;
         string[] str = txt.text.Split('\n');
         for (int i = 0; i < str.Length; i++)
         {
@@ -268,6 +268,7 @@ public class CardiacSimulation : MonoBehaviour
     private Bounds[] vertexbounds;
 
     private GameObject triggerButtonObject;
+    private GameObject resetButtonObject;
     private GameObject triggerButtonTextObject;
     private GameObject triggerTextObject;
     private GameObject ablationTextObject;
@@ -296,6 +297,13 @@ public class CardiacSimulation : MonoBehaviour
             // Get the Button component from the found GameObject
             Button button = triggerButtonObject.GetComponent<Button>();
             button.onClick.AddListener(ButtonClicked);
+        }
+        resetButtonObject = GameObject.Find("TabletResetButton");
+        if (resetButtonObject != null)
+        {
+            // Get the Button component from the found GameObject
+            Button button = resetButtonObject.GetComponent<Button>();
+            button.onClick.AddListener(ResetButtonClicked);
         }
         triggerButtonTextObject = GameObject.Find("GlassTextForButton");
         if (triggerButtonTextObject != null)
@@ -405,6 +413,8 @@ public class CardiacSimulation : MonoBehaviour
         laplacian = ComputeLaplacian();
         ablationNodes = new HashSet<int>();
         triggerNodes = new HashSet<int>();
+        ablationText.text = "Ablation Nodes Count: " + ablationNodes.Count + "/100";
+        triggerText.text = "Trigger Nodes Count: " + triggerNodes.Count + "/10";
 
 
         // start
@@ -532,6 +542,31 @@ public class CardiacSimulation : MonoBehaviour
     {
         Debug.Log("Button pressed! - " + isParameterEnabled);
         isParameterEnabled ^= true;
+    }
+
+    private void ResetButtonClicked()
+    {
+        Debug.Log("Button pressed!12345555 - " + isParameterEnabled);
+        int j = 0;
+        foreach (int i in triggerNodes)
+        {
+            triggerNodeSquare[j].SetActive(false);
+            j++;
+            //color_idx[i] = 55;
+        }
+        j = 0;
+        foreach (int i in ablationNodes)
+        {
+            ablationNodeSquare[j].SetActive(false);
+            j++;
+            //color_idx[i] = 55;
+        }
+
+        triggerNodes.Clear();
+        ablationNodes.Clear();
+
+        ablationText.text = "Ablation Nodes Count: " + ablationNodes.Count + "/100";
+        triggerText.text = "Trigger Nodes Count: " + triggerNodes.Count + "/10";
     }
 
     private bool inAblationNodes(int i)
